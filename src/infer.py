@@ -1,3 +1,4 @@
+from collections import defaultdict
 import numpy as np
 import pandas as pd
 import torch
@@ -44,6 +45,7 @@ def draw_bbox_array(
     det,
     img_shape,
     img_src,
+    sic,
 ):
     if isinstance(img_src, list):
         img_src = np.array(img_src).astype(np.float32)
@@ -52,7 +54,7 @@ def draw_bbox_array(
     det[:, :4] = rescale(img_shape, det[:, :4], img_src.shape).round()
     for *xyxy, conf, cls in reversed(det):
         class_num = int(cls)
-        label = f"{conf:.2f}"
+        label = f"{conf:.2f}" if sic else ""
         plot_box_and_label(
             img_ori,
             max(round(sum(img_ori.shape) / 2 * 0.003), 2),
@@ -155,3 +157,27 @@ def generate_colors(i, bgr=False):
     num = len(palette)
     color = palette[int(i) % num]
     return (color[2], color[1], color[0]) if bgr else color
+
+
+def make_csv(det):
+    csv = defaultdict(list)
+    for d in det:
+        x, y, x2, y2, c, _ = d
+        w, h = x2 - x, y2 - y
+        x, y = x + w / 2, y + h / 2
+
+        csv["x_center"] += [int(x)]
+        csv["y_center"] += [int(y)]
+        csv["width"] += [int(w)]
+        csv["height"] += [int(h)]
+        csv["confidence"] += [float(c)]
+        csv["area"] += [int(w * h)]
+    return csv
+
+
+def xywh2xyxy(bbox):
+    x1 = bbox[:, 0] - bbox[:, 2] / 2
+    x2 = bbox[:, 0] + bbox[:, 2] / 2
+    y1 = bbox[:, 1] - bbox[:, 3] / 2
+    y2 = bbox[:, 1] + bbox[:, 3] / 2
+    return np.dstack([x1, y1, x2, y2])[0]
