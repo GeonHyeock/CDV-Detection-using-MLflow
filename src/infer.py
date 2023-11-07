@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import torch
 import cv2
-
+import requests
 import sys, os
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
@@ -11,12 +11,25 @@ from YOLOv6.yolov6.data.data_augment import letterbox
 from YOLOv6.yolov6.utils.nms import non_max_suppression
 
 
-def Infer(model, img):
+def server_infer(d):
+    uri = "http://0.0.0.0:5002/invocations"
+    H = {"Content-Type": "application/json"}
+    D = {"inputs": d}
+    res = requests.post(url=uri, json=D, headers=H)
+    if res.status_code == 200:
+        result = res.json()
+        return result["predictions"]
+    else:
+        print("Request failed with status code:", res.status_code)
+        print(f"error : {res.text}")
+
+
+def Infer(img):
     img, _ = process_image(img, (640, 640), stride=32, half=False)
     if len(img.shape) == 3:
         img = img[None]
 
-    pred = model.predict(np.array(img))
+    pred = server_infer(np.array(img).tolist())
     det = non_max_suppression(
         torch.tensor(pred),
         conf_thres=0.4,
@@ -50,8 +63,8 @@ def draw_bbox_array(
     if isinstance(img_src, list):
         img_src = np.array(img_src).astype(np.float32)
 
-    img_ori, det = (img_src.copy()), torch.tensor(det)
-    det[:, :4] = rescale(img_shape, det[:, :4], img_src.shape).round()
+    img_ori = img_src.copy()
+    det[:, :4] = rescale(img_shape, torch.tensor(det)[:, :4], img_src.shape).round()
     for *xyxy, conf, cls in reversed(det):
         class_num = int(cls)
         label = f"{conf:.2f}" if sic else ""

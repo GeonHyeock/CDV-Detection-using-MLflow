@@ -9,33 +9,11 @@ import os
 from infer import draw_bbox_array, Infer, make_csv, xywh2xyxy
 
 
-@st.cache_data()
-def load_model(logged_model="runs:/096a362268c64363b896555db566d5d5/model"):
-    loaded_model = mlflow.pyfunc.load_model(logged_model)
-    return loaded_model
-
-
-def infer(image):
-    res = requests.post(
-        url=args.uri,
-        json={"inputs": image},
-        headers={"Content-Type": "application/json"},
-    )
-    if res.status_code == 200:
-        result = res.json()
-        return result["predictions"]
-    else:
-        print("Request failed with status code:", res.status_code)
-
-
-def main(args):
+def main():
     st.title("Clustering")
 
     with st.sidebar:
         sic = st.checkbox("Show Inference confidence")
-
-    if "model" not in st.session_state:
-        st.session_state.model = load_model()
 
     tab1, tab2 = st.tabs(["Inference", "Train model result"])
 
@@ -54,7 +32,7 @@ def main(args):
             draw_img_array = (
                 np.expand_dims(np.swapaxes(image, 0, 2), 0).astype(np.float32) / 255
             )
-            result = Infer(st.session_state.model, image)[:-1]
+            result = Infer(image)[:-1]
 
             with col2:
                 st.write("결과")
@@ -104,7 +82,7 @@ def main(args):
 
         with tab2_col3:
             st.write("추론 bbox")
-            result = Infer(st.session_state.model, img)[:-1]
+            result = Infer(img)[:-1]
             draw_img_array, det = draw_bbox_array(result, (640, 640), img, sic)
             st.image(draw_img_array)
 
@@ -113,12 +91,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--uri",
-        default="http://127.0.0.1/invocations",
-        help="serving된 모델 uri",
-    )
-    args = parser.parse_args()
-
-    main(args)
+    main()
