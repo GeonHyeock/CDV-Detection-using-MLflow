@@ -14,6 +14,8 @@ def main():
 
     with st.sidebar:
         sic = st.checkbox("Show Inference confidence")
+        conf_thres = st.slider("conf_thres", 0.0, 1.0, 0.4, 0.01)
+        iou_thres = st.slider("iou_thres", 0.0, 1.0, 0.45, 0.01)
 
     tab1, tab2 = st.tabs(["Inference", "Train model result"])
 
@@ -21,7 +23,7 @@ def main():
         uploaded_file = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"])
         if uploaded_file:
             image_bytes = uploaded_file.getvalue()
-            image = cv2.imdecode(np.fromstring(image_bytes, np.uint8), flags=1)
+            image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), flags=1)
             col1, col2 = st.columns(2)
             with col1:
                 st.write("원본")
@@ -32,7 +34,7 @@ def main():
             draw_img_array = (
                 np.expand_dims(np.swapaxes(image, 0, 2), 0).astype(np.float32) / 255
             )
-            result = Infer(image)[:-1]
+            result = Infer(image, conf_thres, iou_thres)[:-1]
 
             with col2:
                 st.write("결과")
@@ -82,7 +84,7 @@ def main():
 
         with tab2_col3:
             st.write("추론 bbox")
-            result = Infer(img)[:-1]
+            result = Infer(img, conf_thres, iou_thres)[:-1]
             draw_img_array, det = draw_bbox_array(result, (640, 640), img, sic)
             st.image(draw_img_array)
 

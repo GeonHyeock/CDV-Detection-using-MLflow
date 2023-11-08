@@ -12,10 +12,10 @@ from YOLOv6.yolov6.utils.nms import non_max_suppression
 
 
 def server_infer(d):
-    uri = "http://0.0.0.0:5002/invocations"
+    url = "http://0.0.0.0:5002/invocations"
     H = {"Content-Type": "application/json"}
     D = {"inputs": d}
-    res = requests.post(url=uri, json=D, headers=H)
+    res = requests.post(url=url, json=D, headers=H)
     if res.status_code == 200:
         result = res.json()
         return result["predictions"]
@@ -24,7 +24,7 @@ def server_infer(d):
         print(f"error : {res.text}")
 
 
-def Infer(img):
+def Infer(img, conf_thres, iou_thres):
     img, _ = process_image(img, (640, 640), stride=32, half=False)
     if len(img.shape) == 3:
         img = img[None]
@@ -32,8 +32,8 @@ def Infer(img):
     pred = server_infer(np.array(img).tolist())
     det = non_max_suppression(
         torch.tensor(pred),
-        conf_thres=0.4,
-        iou_thres=0.45,
+        conf_thres=conf_thres,
+        iou_thres=iou_thres,
         classes=None,
         agnostic=False,
         max_det=1000,
@@ -64,7 +64,7 @@ def draw_bbox_array(
         img_src = np.array(img_src).astype(np.float32)
 
     img_ori = img_src.copy()
-    det[:, :4] = rescale(img_shape, torch.tensor(det)[:, :4], img_src.shape).round()
+    det = rescale(img_shape, torch.Tensor(det), img_src.shape).round()
     for *xyxy, conf, cls in reversed(det):
         class_num = int(cls)
         label = f"{conf:.2f}" if sic else ""
