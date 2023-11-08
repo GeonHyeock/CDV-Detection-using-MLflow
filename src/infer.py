@@ -63,8 +63,8 @@ def draw_bbox_array(
     if isinstance(img_src, list):
         img_src = np.array(img_src).astype(np.float32)
 
-    img_ori = img_src.copy()
-    det = rescale(img_shape, torch.Tensor(det), img_src.shape).round()
+    img_ori, det = img_src.copy(), torch.Tensor(det)
+    det[:, :4] = rescale(img_shape, det[:, :4], img_src.shape).round()
     for *xyxy, conf, cls in reversed(det):
         class_num = int(cls)
         label = f"{conf:.2f}" if sic else ""
