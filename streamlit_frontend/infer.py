@@ -7,8 +7,8 @@ import requests
 import sys, os
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from YOLOv6.yolov6.data.data_augment import letterbox
-from YOLOv6.yolov6.utils.nms import non_max_suppression
+from mlflow_model.yolov6.data.data_augment import letterbox
+from mlflow_model.yolov6.utils.nms import non_max_suppression
 
 
 def server_infer(d):
