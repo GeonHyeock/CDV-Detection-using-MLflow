@@ -29,8 +29,6 @@ def main():
                 st.write("원본")
                 st.image(image)
 
-            # demo
-
             draw_img_array = (
                 np.expand_dims(np.swapaxes(image, 0, 2), 0).astype(np.float32) / 255
             )
@@ -87,9 +85,6 @@ def main():
             result = Infer(img, conf_thres, iou_thres)[:-1]
             draw_img_array, det = draw_bbox_array(result, (640, 640), img, sic)
             st.image(draw_img_array)
-
-        st.write("metric_chart")
-        st.image("data/스크린샷 2023-10-21 오전 2.31.35.png")
 
 
 if __name__ == "__main__":
