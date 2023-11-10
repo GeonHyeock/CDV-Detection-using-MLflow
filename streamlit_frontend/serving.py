@@ -56,8 +56,8 @@ def main():
             "Set selectbox data_type",
             options=["train", "valid", "test"],
         )
-        image_path = f"/home/user/clustering/data/{data_type}/images"
-        label_path = f"/home/user/clustering/data/{data_type}/labels"
+        image_path = f"./data/{data_type}/images"
+        label_path = f"./data/{data_type}/labels"
         img_path = st.selectbox(
             "image를 선택해주세요.",
             os.listdir(image_path),
