@@ -5,10 +5,12 @@ import torch
 import cv2
 import requests
 import time
+import torchvision
 
 
 def server_infer(d):
-    url = "http://0.0.0.0:5002/invocations"
+    # url arg로 받을 수 있게 추후에 수정!
+    url = "http://165.246.121.112:5001/invocations"
     H = {"Content-Type": "application/json"}
     D = {"inputs": d}
     res = requests.post(url=url, json=D, headers=H)
@@ -22,8 +24,6 @@ def server_infer(d):
 
 def Infer(img, conf_thres, iou_thres):
     img, _ = process_image(img, (640, 640), stride=32, half=False)
-    if len(img.shape) == 3:
-        img = img[None]
 
     pred = server_infer(np.array(img).tolist())
     det = non_max_suppression(
@@ -34,6 +34,9 @@ def Infer(img, conf_thres, iou_thres):
         agnostic=False,
         max_det=1000,
     )[0]
+
+    if len(img.shape) == 3:
+        img = img[None]
     img_shape = torch.tensor([[*img.shape[2:], 0, 0, 0, 0]])
     return torch.cat([det.cpu(), img_shape])
 
@@ -184,12 +187,14 @@ def make_csv(det):
     return csv
 
 
-def xywh2xyxy(bbox):
-    x1 = bbox[:, 0] - bbox[:, 2] / 2
-    x2 = bbox[:, 0] + bbox[:, 2] / 2
-    y1 = bbox[:, 1] - bbox[:, 3] / 2
-    y2 = bbox[:, 1] + bbox[:, 3] / 2
-    return np.dstack([x1, y1, x2, y2])[0]
+def xywh2xyxy(x):
+    # Convert boxes with shape [n, 4] from [x, y, w, h] to [x1, y1, x2, y2] where x1y1 is top-left, x2y2=bottom-right
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = x[:, 0] - x[:, 2] / 2  # top left x
+    y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
+    y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
+    y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
+    return y
 
 
 def letterbox(
