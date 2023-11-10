@@ -6,7 +6,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import os
-from infer import draw_bbox_array, Infer, make_csv, xywh2xyxy
+from util import draw_bbox_array, Infer, make_csv, xywh2xyxy
 
 
 def main():
