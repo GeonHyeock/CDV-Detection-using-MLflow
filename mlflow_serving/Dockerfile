@@ -58,7 +58,6 @@ RUN apt-get -y update && \
 # build
 ARG LOCAL_PATH="/home/inhamath/Clustering"
 
-COPY ./mlruns/ ${LOCAL_PATH}/mlruns
 COPY ./mlflow_model/requirment.txt ${LOCAL_PATH}/requirment.txt
 WORKDIR ${LOCAL_PATH}
 RUN pip install --upgrade pip && \
