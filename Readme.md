@@ -19,7 +19,7 @@ CDV라 예상되는 물질의 위치정보를 알면 후처리 기능을 이용�
 
 ## Model
 
-<img width="100%" src="./images/DBSCAN.png"/>
+<img width="50%" src="./images/DBSCAN.png"/>
 
 DBSCAN을 활용하여 CDV라 예상되는 물질을 검출하려 하였으나 붉은 원 안의 물질은 서로 다른 물질이지만 하나의 물질로 인식하는 한계점이 있었다. \
 이러한 한계점을 극복하기 위하여 YOLO모델을 활용하기로 결정 하였다.
