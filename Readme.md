@@ -82,7 +82,7 @@ mlflow ui
 sudo docker build -t mlflow_serving --build-arg LOCAL_PATH={mlrun_path} -f mlflow_serving/Dockerfile .
 
 3. docker run
-sh shell/serving.sh
+sh shell/model_serving.sh
 ~~~
 
 ### Frontend Streamlit
