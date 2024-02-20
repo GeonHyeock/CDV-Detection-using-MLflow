@@ -45,11 +45,11 @@ def main():
                 )
 
     with tab2:
-        uploaded_zip = st.file_uploader("Choose an image", type=["zip"])
+        uploaded_zip = st.file_uploader("Choose an image ZIP", type=["zip"])
         if uploaded_zip:
             zip_name = uploaded_zip.name[:-4]
-            buf = io.BytesIO()
             with zipfile.ZipFile(uploaded_zip, "r") as z:
+                buf = io.BytesIO()
                 with zipfile.ZipFile(buf, "x") as csv_zip:
                     files = [f for f in z.namelist() if f.split(".")[-1] in ["jpg", "jpeg", "png"]]
                     for file in stqdm(files):
@@ -60,14 +60,12 @@ def main():
                         csv = make_csv(det)
                         csv_name = ".".join(file.replace(zip_name, zip_name + "_result").split(".")[:-1] + ["csv"])
                         csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
-
             st.download_button(
                 label="Download result zip",
                 data=buf.getvalue(),
                 file_name=zip_name + "_result.zip",
                 mime="application/zip",
             )
-            del uploaded_zip
 
     with tab3:
         data_type = st.radio(
@@ -76,11 +74,12 @@ def main():
         )
         image_path = f"./data/{data_type}/images"
         label_path = f"./data/{data_type}/labels"
+
         img_path = st.selectbox(
             "image를 선택해주세요.",
             os.listdir(image_path),
         )
-
+        agree = st.checkbox("추론 결과를 원한다면 체크해주세요.")
         tab2_col1, tab2_col2, tab2_col3 = st.columns(3)
         with tab2_col1:
             st.write("원본")
@@ -102,9 +101,10 @@ def main():
 
         with tab2_col3:
             st.write("추론 bbox")
-            result = Infer(img, conf_thres, iou_thres)[:-1]
-            draw_img_array, det = draw_bbox_array(result, (640, 640), img, sic)
-            st.image(draw_img_array)
+            if agree:
+                result = Infer(img, conf_thres, iou_thres)[:-1]
+                draw_img_array, det = draw_bbox_array(result, (640, 640), img, sic)
+                st.image(draw_img_array)
 
 
 if __name__ == "__main__":
