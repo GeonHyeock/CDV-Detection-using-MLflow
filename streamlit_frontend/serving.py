@@ -51,7 +51,7 @@ def main():
             buf = io.BytesIO()
             with zipfile.ZipFile(uploaded_zip, "r") as z:
                 with zipfile.ZipFile(buf, "x") as csv_zip:
-                    files = [f.split(".")[-1] in ["jpg", "jpeg", "png"] for f in z.namelist()]
+                    files = [f for f in z.namelist() if f.split(".")[-1] in ["jpg", "jpeg", "png"]]
                     for file in stqdm(files):
                         image = np.frombuffer(z.read(file), np.uint8)
                         image = cv2.imdecode(image, flags=1)
