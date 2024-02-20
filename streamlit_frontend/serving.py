@@ -51,15 +51,15 @@ def main():
             buf = io.BytesIO()
             with zipfile.ZipFile(uploaded_zip, "r") as z:
                 with zipfile.ZipFile(buf, "x") as csv_zip:
-                    for file in stqdm(z.namelist()):
-                        if file.split(".")[-1] in ["jpg", "jpeg", "png"]:
-                            image = np.frombuffer(z.read(file), np.uint8)
-                            image = cv2.imdecode(image, flags=1)
-                            result = Infer(image, conf_thres, iou_thres)[:-1]
-                            det = draw_bbox_array(result, (640, 640), image, sic, only_det=True)
-                            csv = make_csv(det)
-                            csv_name = ".".join(file.replace(zip_name, zip_name + "_result").split(".")[:-1] + ["csv"])
-                            csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
+                    files = [f.split(".")[-1] in ["jpg", "jpeg", "png"] for f in z.namelist()]
+                    for file in stqdm(files):
+                        image = np.frombuffer(z.read(file), np.uint8)
+                        image = cv2.imdecode(image, flags=1)
+                        result = Infer(image, conf_thres, iou_thres)[:-1]
+                        det = draw_bbox_array(result, (640, 640), image, sic, only_det=True)
+                        csv = make_csv(det)
+                        csv_name = ".".join(file.replace(zip_name, zip_name + "_result").split(".")[:-1] + ["csv"])
+                        csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
 
             st.download_button(
                 label="Download result zip",
