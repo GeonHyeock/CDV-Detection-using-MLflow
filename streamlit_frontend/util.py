@@ -24,7 +24,7 @@ def server_infer(d):
 
 
 def Infer(img, conf_thres, iou_thres):
-    img, _ = process_image(img, (640, 640), stride=32, half=False)
+    img = [process_image(i, (640, 640), stride=32, half=False)[0] for i in img]
     pred = server_infer(np.array(img).tolist())
     det = non_max_suppression(
         torch.tensor(pred),

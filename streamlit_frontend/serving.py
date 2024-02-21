@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import zipfile
 import io
+import shutil
 from stqdm import stqdm
 from util import draw_bbox_array, Infer, make_csv, xywh2xyxy
 
@@ -49,24 +50,32 @@ def main():
             uploaded_zip = st.file_uploader("Choose an image ZIP", type=["zip"])
             submitted = st.form_submit_button("파일 분석")
             if submitted and uploaded_zip is not None:
-                zip_name = uploaded_zip.name[:-4]
                 with zipfile.ZipFile(uploaded_zip, "r") as z:
-                    buf = io.BytesIO()
-                    with zipfile.ZipFile(buf, "x") as csv_zip:
-                        files = [f for f in z.namelist() if f.split(".")[-1] in ["jpg", "jpeg", "png"]]
-                        for file in stqdm(files):
-                            image = np.frombuffer(z.read(file), np.uint8)
-                            image = cv2.imdecode(image, flags=1)
-                            result = Infer(image, conf_thres, iou_thres)[:-1]
-                            det = draw_bbox_array(result, (640, 640), image, sic, only_det=True)
-                            csv = make_csv(det)
-                            csv_name = ".".join(file.replace(zip_name, zip_name + "_result").split(".")[:-1] + ["csv"])
-                            csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
-        if submitted and uploaded_zip is not None:
+                    if os.path.exists("inputdata"):
+                        shutil.rmtree("inputdata")
+                    z.extractall("inputdata")
+
+        if os.path.exists("inputdata"):
+            img_path_list = [
+                root + "/" + file_name
+                for root, _, files in os.walk("inputdata")
+                for file_name in files
+                if os.path.splitext(file_name)[-1] in [".jpg", ".jpeg", ".png"]
+            ]
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "x") as csv_zip:
+                for file in stqdm(img_path_list):
+                    image = np.stack([cv2.imread(f) for f in img_path_list])
+                    result = Infer(image, conf_thres, iou_thres)[:-1]
+                    det = draw_bbox_array(result, (640, 640), image, sic, only_det=True)
+                    csv = make_csv(det)
+                    csv_name = ".".join(file.split(".")[:-1] + ["csv"])
+                    csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
+            shutil.rmtree("inputdata")
             st.download_button(
                 label="Download result zip",
                 data=buf.getvalue(),
-                file_name=zip_name + "_result.zip",
+                file_name="result.zip",
                 mime="application/zip",
             )
 
