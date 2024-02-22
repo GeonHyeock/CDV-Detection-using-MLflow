@@ -31,17 +31,17 @@ def main():
                 st.image(image)
 
             draw_img_array = np.expand_dims(np.swapaxes(image, 0, 2), 0).astype(np.float32) / 255
-            result = Infer(image, conf_thres, iou_thres)[:-1]
+            det = Infer(image, conf_thres, iou_thres)
 
             with col2:
                 st.write("결과")
-                draw_img_array, det = draw_bbox_array(result, (640, 640), image, sic)
+                draw_img_array, det = draw_bbox_array(det[0], (640, 640), image, sic)
                 st.image(draw_img_array)
 
-                csv = make_csv(det)
+                csv = make_csv(det)[0]
                 st.download_button(
                     label="Download result CSV",
-                    data=pd.DataFrame(csv).reset_index().to_csv(index=False).encode("utf-8"),
+                    data=pd.DataFrame(csv).to_csv(index=False).encode("utf-8"),
                     file_name=f"{'.'.join(uploaded_file.name.split('.')[:-1])}_result.csv",
                 )
 
@@ -52,8 +52,11 @@ def main():
             if submitted and uploaded_zip is not None:
                 with zipfile.ZipFile(uploaded_zip, "r") as z:
                     if os.path.exists("inputdata"):
-                        shutil.rmtree("inputdata")
-                    z.extractall("inputdata")
+                        shutil.rmtree("inputdata", ignore_errors=True)
+                    z.extractall(f"inputdata/{'.'.join(z.filename.split('.')[:-1])}")
+            else:
+                if os.path.exists("inputdata"):
+                    shutil.rmtree("inputdata", ignore_errors=True)
 
         if os.path.exists("inputdata"):
             img_path_list = [
@@ -64,18 +67,20 @@ def main():
             ]
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, "x") as csv_zip:
-                for file in stqdm(img_path_list):
-                    image = np.stack([cv2.imread(f) for f in img_path_list])
-                    result = Infer(image, conf_thres, iou_thres)[:-1]
-                    det = draw_bbox_array(result, (640, 640), image, sic, only_det=True)
-                    csv = make_csv(det)
-                    csv_name = ".".join(file.split(".")[:-1] + ["csv"])
-                    csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
-            shutil.rmtree("inputdata")
+                batch_size = 2
+                for idx in stqdm(range(0, len(img_path_list), batch_size)):
+                    image = [cv2.imread(f) for f in img_path_list[idx : idx + batch_size]]
+                    det = Infer(image, conf_thres, iou_thres)
+                    csvs = make_csv(det)
+                    for i, csv in enumerate(csvs):
+                        file = img_path_list[idx + i]
+                        csv_name = ".".join("/".join(file.split("/")[1:]).split(".")[:-1] + ["csv"])
+                        csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
+
             st.download_button(
                 label="Download result zip",
                 data=buf.getvalue(),
-                file_name="result.zip",
+                file_name=f"{os.listdir('inputdata')[0]}_conf({conf_thres:.2f})_iou({iou_thres:.2f}).zip",
                 mime="application/zip",
             )
 

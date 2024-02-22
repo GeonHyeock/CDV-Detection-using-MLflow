@@ -24,7 +24,9 @@ def server_infer(d):
 
 
 def Infer(img, conf_thres, iou_thres):
-    img = [process_image(i, (640, 640), stride=32, half=False)[0] for i in img]
+    if isinstance(img, np.ndarray) and len(img.shape) == 3:
+        img = img[None]
+    img = torch.stack([process_image(i, (640, 640), stride=32, half=False)[0] for i in img])
     pred = server_infer(np.array(img).tolist())
     det = non_max_suppression(
         torch.tensor(pred),
@@ -33,12 +35,10 @@ def Infer(img, conf_thres, iou_thres):
         classes=None,
         agnostic=False,
         max_det=1000,
-    )[0]
-    if len(img.shape) == 3:
-        img = img[None]
+    )
 
-    img_shape = torch.tensor([[*img.shape[2:], 0, 0, 0, 0]])
-    return torch.cat([det.cpu(), img_shape])
+    # img_shape = torch.tensor([[*img.shape[2:], 0, 0, 0, 0]])
+    return det
 
 
 def process_image(img_src, img_size, stride, half):
@@ -53,14 +53,12 @@ def process_image(img_src, img_size, stride, half):
     return image, img_src
 
 
-def draw_bbox_array(det, img_shape, img_src, sic, only_det=False):
+def draw_bbox_array(det, img_shape, img_src, sic):
     if isinstance(img_src, list):
         img_src = np.array(img_src).astype(np.float32)
 
     img_ori, det = img_src.copy(), torch.Tensor(det)
     det[:, :4] = rescale(img_shape, det[:, :4], img_src.shape).round()
-    if only_det:
-        return det
     for *xyxy, conf, cls in reversed(det):
         class_num = int(cls)
         label = f"{conf:.2f}" if sic else ""
@@ -164,20 +162,26 @@ def generate_colors(i, bgr=False):
     return (color[2], color[1], color[0]) if bgr else color
 
 
-def make_csv(det):
-    csv = defaultdict(list)
-    for d in det:
-        x, y, x2, y2, c, _ = d
-        w, h = x2 - x, y2 - y
-        x, y = x + w / 2, y + h / 2
+def make_csv(dets):
+    result = []
+    if torch.is_tensor(dets) and len(dets.shape) == 2:
+        dets = dets[None]
 
-        csv["x_center"] += [int(x)]
-        csv["y_center"] += [int(y)]
-        csv["width"] += [int(w)]
-        csv["height"] += [int(h)]
-        csv["confidence"] += [float(c)]
-        csv["area"] += [int(w * h)]
-    return csv
+    for det in dets:
+        csv = defaultdict(list)
+        for d in det:
+            x, y, x2, y2, c, _ = d
+            w, h = x2 - x, y2 - y
+            x, y = x + w / 2, y + h / 2
+
+            csv["x_center"] += [int(x)]
+            csv["y_center"] += [int(y)]
+            csv["width"] += [int(w)]
+            csv["height"] += [int(h)]
+            csv["confidence"] += [float(c)]
+            csv["area"] += [int(w * h)]
+        result.append(csv)
+    return result
 
 
 def xywh2xyxy(x):
