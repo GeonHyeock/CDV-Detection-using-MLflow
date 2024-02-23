@@ -53,12 +53,16 @@ def process_image(img_src, img_size, stride, half):
     return image, img_src
 
 
-def draw_bbox_array(det, img_shape, img_src, sic):
+def draw_bbox_array(det, img_shape, img_src, sic, only_det=False):
     if isinstance(img_src, list):
         img_src = np.array(img_src).astype(np.float32)
 
     img_ori, det = img_src.copy(), torch.Tensor(det)
     det[:, :4] = rescale(img_shape, det[:, :4], img_src.shape).round()
+
+    if only_det:
+        return det
+
     for *xyxy, conf, cls in reversed(det):
         class_num = int(cls)
         label = f"{conf:.2f}" if sic else ""
