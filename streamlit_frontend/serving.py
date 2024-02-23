@@ -71,7 +71,7 @@ def main():
                 for idx in stqdm(range(0, len(img_path_list), batch_size)):
                     image = [cv2.imread(f) for f in img_path_list[idx : idx + batch_size]]
                     det = Infer(image, conf_thres, iou_thres)
-                    det = draw_bbox_array(det, (640, 640), image, sic)
+                    det = draw_bbox_array(det, (640, 640), image, sic, only_det=True)
                     csvs = make_csv(det)
                     for i, csv in enumerate(csvs):
                         file = img_path_list[idx + i]

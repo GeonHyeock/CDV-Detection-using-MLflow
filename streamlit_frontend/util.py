@@ -36,8 +36,6 @@ def Infer(img, conf_thres, iou_thres):
         agnostic=False,
         max_det=1000,
     )
-
-    # img_shape = torch.tensor([[*img.shape[2:], 0, 0, 0, 0]])
     return det
 
 
@@ -54,14 +52,17 @@ def process_image(img_src, img_size, stride, half):
 
 
 def draw_bbox_array(det, img_shape, img_src, sic, only_det=False):
+    if only_det:
+        rescale_det = [rescale(img_shape, d[:, :4], img.shape).round() for d, img in zip(det, img_src)]
+        for idx in range(len(det)):
+            det[idx][:, :4] = rescale_det[idx][:, :4]
+        return det
+
     if isinstance(img_src, list):
         img_src = np.array(img_src).astype(np.float32)
 
     img_ori, det = img_src.copy(), torch.Tensor(det)
     det[:, :4] = rescale(img_shape, det[:, :4], img_src.shape).round()
-
-    if only_det:
-        return det
 
     for *xyxy, conf, cls in reversed(det):
         class_num = int(cls)
@@ -115,7 +116,6 @@ def plot_box_and_label(
 ):
     # Add one xyxy box to image with label
     p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
-    cv2.rectangle(image, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
     if label:
         tf = max(lw - 1, 1)  # font thickness
         w, h = cv2.getTextSize(label, 0, fontScale=lw / 3, thickness=tf)[0]  # text width, height
@@ -132,6 +132,8 @@ def plot_box_and_label(
             thickness=tf,
             lineType=cv2.LINE_AA,
         )
+    else:
+        cv2.rectangle(image, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
 
 
 def generate_colors(i, bgr=False):
