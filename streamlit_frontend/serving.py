@@ -49,14 +49,12 @@ def main():
         with st.form("my-form", clear_on_submit=True):
             uploaded_zip = st.file_uploader("Choose an image ZIP", type=["zip"])
             submitted = st.form_submit_button("파일 분석")
-            if submitted and uploaded_zip is not None:
-                with zipfile.ZipFile(uploaded_zip, "r") as z:
-                    if os.path.exists("inputdata"):
-                        shutil.rmtree("inputdata", ignore_errors=True)
-                    z.extractall(f"inputdata/{'.'.join(z.filename.split('.')[:-1])}")
-            else:
+            if submitted:
                 if os.path.exists("inputdata"):
                     shutil.rmtree("inputdata", ignore_errors=True)
+                if uploaded_zip is not None:
+                    with zipfile.ZipFile(uploaded_zip, "r") as z:
+                        z.extractall(f"inputdata/{'.'.join(z.filename.split('.')[:-1])}")
 
         if os.path.exists("inputdata"):
             img_path_list = [
@@ -84,6 +82,7 @@ def main():
                 file_name=f"{os.listdir('inputdata')[0]}_conf({conf_thres:.2f})_iou({iou_thres:.2f}).zip",
                 mime="application/zip",
             )
+            shutil.rmtree("inputdata", ignore_errors=True)
 
     with tab3:
         data_type = st.radio(
