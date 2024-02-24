@@ -6,12 +6,19 @@ import os
 import zipfile
 import io
 import shutil
-from stqdm import stqdm
-from util import draw_bbox_array, Infer, make_csv, xywh2xyxy
+import ray
+from util import draw_bbox_array, Infer, make_csv
+from ray_infer import batch_infer
 
 
 def main():
     st.title("Clustering")
+    if "ray" not in st.session_state:
+        st.session_state.ray = False
+
+    if st.session_state.ray == True:
+        st.session_state.ray = False
+        ray.shutdown()
 
     with st.sidebar:
         sic = st.checkbox("Show Inference confidence")
@@ -25,6 +32,7 @@ def main():
         if uploaded_file:
             image_bytes = uploaded_file.getvalue()
             image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), flags=1)
+
             col1, col2 = st.columns(2)
             with col1:
                 st.write("원본")
@@ -37,7 +45,6 @@ def main():
                 st.write("결과")
                 draw_img_array, det = draw_bbox_array(det[0], (640, 640), image, sic)
                 st.image(draw_img_array)
-
                 csv = make_csv(det)[0]
                 st.download_button(
                     label="Download result CSV",
@@ -63,17 +70,26 @@ def main():
                 for file_name in files
                 if os.path.splitext(file_name)[-1] in [".jpg", ".jpeg", ".png"]
             ]
-            buf = io.BytesIO()
+            batch_size, n = 2, len(img_path_list)
+
+            if st.session_state.ray == False:
+                st.session_state.ray = True
+                ray.init(
+                    ignore_reinit_error=True,
+                    runtime_env={"py_modules": ["streamlit_frontend"]},
+                )
+            batch_result = [
+                batch_infer.remote(img_path_list[idx : idx + batch_size], conf_thres, iou_thres, (640, 640), sic)
+                for idx in range(0, n, batch_size)
+            ]
+            batch_result, buf = ray.get(batch_result), io.BytesIO()
+            if st.session_state.ray == True:
+                st.session_state.ray = False
+                ray.shutdown()
+
             with zipfile.ZipFile(buf, "x") as csv_zip:
-                batch_size = 2
-                for idx in stqdm(range(0, len(img_path_list), batch_size)):
-                    image = [cv2.imread(f) for f in img_path_list[idx : idx + batch_size]]
-                    det = Infer(image, conf_thres, iou_thres)
-                    det = draw_bbox_array(det, (640, 640), image, sic, only_det=True)
-                    csvs = make_csv(det)
-                    for i, csv in enumerate(csvs):
-                        file = img_path_list[idx + i]
-                        csv_name = ".".join("/".join(file.split("/")[1:]).split(".")[:-1] + ["csv"])
+                for csvs, csv_names in batch_result:
+                    for csv, csv_name in zip(csvs, csv_names):
                         csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
 
             st.download_button(
@@ -84,44 +100,44 @@ def main():
             )
             shutil.rmtree("inputdata", ignore_errors=True)
 
-    with tab3:
-        data_type = st.radio(
-            "Set selectbox data_type",
-            options=["train", "valid", "test"],
-        )
-        image_path = f"./data/{data_type}/images"
-        label_path = f"./data/{data_type}/labels"
+    # with tab3:
+    #     data_type = st.radio(
+    #         "Set selectbox data_type",
+    #         options=["train", "valid", "test"],
+    #     )
+    #     image_path = f"./data/{data_type}/images"
+    #     label_path = f"./data/{data_type}/labels"
 
-        img_path = st.selectbox(
-            "image를 선택해주세요.",
-            os.listdir(image_path),
-        )
-        agree = st.checkbox("추론 결과를 원한다면 체크해주세요.")
-        tab2_col1, tab2_col2, tab2_col3 = st.columns(3)
-        with tab2_col1:
-            st.write("원본")
-            img = cv2.imread(os.path.join(image_path, img_path))
-            st.image(img)
+    #     img_path = st.selectbox(
+    #         "image를 선택해주세요.",
+    #         os.listdir(image_path),
+    #     )
+    #     agree = st.checkbox("추론 결과를 원한다면 체크해주세요.")
+    #     tab2_col1, tab2_col2, tab2_col3 = st.columns(3)
+    #     with tab2_col1:
+    #         st.write("원본")
+    #         img = cv2.imread(os.path.join(image_path, img_path))
+    #         st.image(img)
 
-        with tab2_col2:
-            st.write("원본 bbox")
-            label = img_path.replace("jpg", "txt")
-            df = pd.read_table(
-                os.path.join(label_path, label),
-                sep=" ",
-                header=None,
-                index_col=0,
-            )
-            det = np.append(xywh2xyxy(df.values), [[1, 0]] * len(df.values), axis=1)
-            draw_img_array, det = draw_bbox_array(det, (1, 1), img, sic)
-            st.image(draw_img_array)
+    #     with tab2_col2:
+    #         st.write("원본 bbox")
+    #         label = img_path.replace("jpg", "txt")
+    #         df = pd.read_table(
+    #             os.path.join(label_path, label),
+    #             sep=" ",
+    #             header=None,
+    #             index_col=0,
+    #         )
+    #         det = np.append(xywh2xyxy(df.values), [[1, 0]] * len(df.values), axis=1)
+    #         draw_img_array, det = draw_bbox_array(det, (1, 1), img, sic)
+    #         st.image(draw_img_array)
 
-        with tab2_col3:
-            st.write("추론 bbox")
-            if agree:
-                result = Infer(img, conf_thres, iou_thres)[:-1]
-                draw_img_array, det = draw_bbox_array(result, (640, 640), img, sic)
-                st.image(draw_img_array)
+    #     with tab2_col3:
+    #         st.write("추론 bbox")
+    #         if agree:
+    #             result = Infer(img, conf_thres, iou_thres)[:-1]
+    #             draw_img_array, det = draw_bbox_array(result, (640, 640), img, sic)
+    #             st.image(draw_img_array)
 
 
 if __name__ == "__main__":
