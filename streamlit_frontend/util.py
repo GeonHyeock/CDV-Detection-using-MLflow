@@ -1,12 +1,10 @@
 from collections import defaultdict
 import numpy as np
-import pandas as pd
 import torch
 import cv2
 import requests
 import time
 import torchvision
-import os
 
 
 def server_infer(d):

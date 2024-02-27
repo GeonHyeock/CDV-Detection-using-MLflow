@@ -4,10 +4,6 @@ import os
 import zipfile
 import io
 import ray
-import sys
-
-sys.path.append("/app/MLOps-CDV-Detection-Model/streamlit_frontend")
-from util import draw_bbox_array, Infer, make_csv
 
 
 def Batch_Infer(
@@ -20,7 +16,8 @@ def Batch_Infer(
 ):
     n = len(img_path_list)
     batch_result = [
-        batch_infer.remote(img_path_list[idx : idx + batch_size], img_shape, sic) for idx in range(0, n, batch_size)
+        batch_infer.remote(img_path_list[idx : idx + batch_size], conf_thres, iou_thres, img_shape, sic)
+        for idx in range(0, n, batch_size)
     ]
     batch_result, buf = ray.get(batch_result), io.BytesIO()
     with zipfile.ZipFile(buf, "x") as csv_zip:
@@ -33,6 +30,8 @@ def Batch_Infer(
 
 @ray.remote
 def batch_infer(img_path_list, conf_thres, iou_thres, img_shape=(640, 640), sic=False):
+    from streamlit_frontend import draw_bbox_array, Infer, make_csv
+
     if not isinstance(img_path_list, list):
         img_path_list = [img_path_list]
     image = [cv2.imread(f) for f in img_path_list]
