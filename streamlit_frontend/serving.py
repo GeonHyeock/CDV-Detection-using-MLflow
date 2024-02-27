@@ -7,8 +7,8 @@ import zipfile
 import io
 import shutil
 import ray
-from util import draw_bbox_array, Infer, make_csv, xywh2xyxy
-from ray_infer import batch_infer
+from util import draw_bbox_array, xywh2xyxy
+from infer import online_infer, batch_infer
 
 
 def main():
@@ -38,14 +38,10 @@ def main():
                 st.write("원본")
                 st.image(image)
 
-            draw_img_array = np.expand_dims(np.swapaxes(image, 0, 2), 0).astype(np.float32) / 255
-            det = Infer(image, conf_thres, iou_thres)
-
             with col2:
+                draw_img_array, csv = online_infer(image, conf_thres, iou_thres, img_shape=(640, 640), sic=sic)
                 st.write("결과")
-                draw_img_array, det = draw_bbox_array(det[0], (640, 640), image, sic)
                 st.image(draw_img_array)
-                csv = make_csv(det)[0]
                 st.download_button(
                     label="Download result CSV",
                     data=pd.DataFrame(csv).to_csv(index=False).encode("utf-8"),
@@ -64,8 +60,9 @@ def main():
                         z.extractall(f"inputdata/{'.'.join(z.filename.split('.')[:-1])}")
 
         if os.path.exists("inputdata"):
+            my_bar = st.progress(0.0, "분석중입니다.")
             img_path_list = [
-                root + "/" + file_name
+                os.path.join(os.getcwd(), root, file_name)
                 for root, _, files in os.walk("inputdata")
                 for file_name in files
                 if os.path.splitext(file_name)[-1] in [".jpg", ".jpeg", ".png"]
@@ -74,18 +71,24 @@ def main():
 
             if st.session_state.ray == False:
                 st.session_state.ray = True
-                ray.init(ignore_reinit_error=True)
+                ray.init(ignore_reinit_error=True, runtime_env={"working_dir": "./streamlit_frontend"})
             batch_result = [
-                batch_infer.remote(img_path_list[idx : idx + batch_size], conf_thres, iou_thres, (640, 640), sic)
+                batch_infer.remote(
+                    img_path_list[idx : idx + batch_size],
+                    conf_thres,
+                    iou_thres,
+                    (640, 640),
+                    os.path.join(os.getcwd(), "inputdata"),
+                )
                 for idx in range(0, n, batch_size)
             ]
-            my_bar, buf, N = st.progress(0.0, "분석중입니다."), io.BytesIO(), len(batch_result)
+            buf, N = io.BytesIO(), len(batch_result)
             with zipfile.ZipFile(buf, "x") as csv_zip:
                 while len(batch_result):
                     done, batch_result = ray.wait(batch_result)
                     mini_batch_result = ray.get(done[0])
                     my_bar_per = 1 - len(batch_result) / N
-                    my_bar.progress(my_bar_per, text=f"분석중입니다. {my_bar_per:.2f}")
+                    my_bar.progress(my_bar_per, text="분석중입니다. : " + str(int(my_bar_per * 100)).zfill(2) + "% / 100%")
 
                     for csv, csv_name in zip(*mini_batch_result):
                         csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
@@ -137,8 +140,7 @@ def main():
         with tab2_col3:
             st.write("추론 bbox")
             if agree:
-                result = Infer(img, conf_thres, iou_thres)[:-1]
-                draw_img_array, det = draw_bbox_array(result, (640, 640), img, sic)
+                draw_img_array, _ = online_infer(img, conf_thres, iou_thres, img_shape=(640, 640), sic=False)
                 st.image(draw_img_array)
 
 

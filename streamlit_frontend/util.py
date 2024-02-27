@@ -2,39 +2,8 @@ from collections import defaultdict
 import numpy as np
 import torch
 import cv2
-import requests
 import time
 import torchvision
-
-
-def server_infer(d):
-    url = "http://165.246.121.112:5001/invocations"
-    H = {"Content-Type": "application/json"}
-    print(len(d))
-    D = {"inputs": d}
-    res = requests.post(url=url, json=D, headers=H)
-    if res.status_code == 200:
-        result = res.json()
-        return result["predictions"]
-    else:
-        print("Request failed with status code:", res.status_code)
-        print(f"error : {res.text}")
-
-
-def Infer(img, conf_thres, iou_thres):
-    if isinstance(img, np.ndarray) and len(img.shape) == 3:
-        img = img[None]
-    img = torch.stack([process_image(i, (640, 640), stride=32, half=False)[0] for i in img])
-    pred = server_infer(np.array(img).tolist())
-    det = non_max_suppression(
-        torch.tensor(pred),
-        conf_thres=conf_thres,
-        iou_thres=iou_thres,
-        classes=None,
-        agnostic=False,
-        max_det=1000,
-    )
-    return det
 
 
 def process_image(img_src, img_size, stride, half):
