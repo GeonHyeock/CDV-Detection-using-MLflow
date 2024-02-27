@@ -79,15 +79,20 @@ def main():
                 batch_infer.remote(img_path_list[idx : idx + batch_size], conf_thres, iou_thres, (640, 640), sic)
                 for idx in range(0, n, batch_size)
             ]
-            batch_result, buf = ray.get(batch_result), io.BytesIO()
+            my_bar, buf, N = st.progress(0.0, "분석중입니다."), io.BytesIO(), len(batch_result)
+            with zipfile.ZipFile(buf, "x") as csv_zip:
+                while len(batch_result):
+                    done, batch_result = ray.wait(batch_result)
+                    mini_batch_result = ray.get(done[0])
+                    my_bar_per = 1 - len(batch_result) / N
+                    my_bar.progress(my_bar_per, text=f"분석중입니다. {my_bar_per:.2f}")
+
+                    for csv, csv_name in zip(*mini_batch_result):
+                        csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
+
             if st.session_state.ray == True:
                 st.session_state.ray = False
                 ray.shutdown()
-
-            with zipfile.ZipFile(buf, "x") as csv_zip:
-                for csvs, csv_names in batch_result:
-                    for csv, csv_name in zip(csvs, csv_names):
-                        csv_zip.writestr(csv_name, pd.DataFrame(csv).to_csv(index=False))
 
             st.download_button(
                 label="Download result zip",
