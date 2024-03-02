@@ -1,44 +1,9 @@
 from collections import defaultdict
 import numpy as np
-import pandas as pd
 import torch
 import cv2
-import requests
 import time
 import torchvision
-
-
-def server_infer(d):
-    # url arg로 받을 수 있게 추후에 수정!
-    url = "http://165.246.121.112:5001/invocations"
-    H = {"Content-Type": "application/json"}
-    D = {"inputs": d}
-    res = requests.post(url=url, json=D, headers=H)
-    if res.status_code == 200:
-        result = res.json()
-        return result["predictions"]
-    else:
-        print("Request failed with status code:", res.status_code)
-        print(f"error : {res.text}")
-
-
-def Infer(img, conf_thres, iou_thres):
-    img, _ = process_image(img, (640, 640), stride=32, half=False)
-
-    pred = server_infer(np.array(img).tolist())
-    det = non_max_suppression(
-        torch.tensor(pred),
-        conf_thres=conf_thres,
-        iou_thres=iou_thres,
-        classes=None,
-        agnostic=False,
-        max_det=1000,
-    )[0]
-
-    if len(img.shape) == 3:
-        img = img[None]
-    img_shape = torch.tensor([[*img.shape[2:], 0, 0, 0, 0]])
-    return torch.cat([det.cpu(), img_shape])
 
 
 def process_image(img_src, img_size, stride, half):
@@ -53,17 +18,19 @@ def process_image(img_src, img_size, stride, half):
     return image, img_src
 
 
-def draw_bbox_array(
-    det,
-    img_shape,
-    img_src,
-    sic,
-):
+def draw_bbox_array(det, img_shape, img_src, sic, only_det=False):
+    if only_det:
+        rescale_det = [rescale(img_shape, d[:, :4], img.shape).round() for d, img in zip(det, img_src)]
+        for idx in range(len(det)):
+            det[idx][:, :4] = rescale_det[idx][:, :4]
+        return det
+
     if isinstance(img_src, list):
         img_src = np.array(img_src).astype(np.float32)
 
     img_ori, det = img_src.copy(), torch.Tensor(det)
     det[:, :4] = rescale(img_shape, det[:, :4], img_src.shape).round()
+
     for *xyxy, conf, cls in reversed(det):
         class_num = int(cls)
         label = f"{conf:.2f}" if sic else ""
@@ -81,9 +48,7 @@ def draw_bbox_array(
 def rescale(ori_shape, boxes, target_shape):
     """Rescale the output to the original image shape"""
     ratio = min(ori_shape[0] / target_shape[0], ori_shape[1] / target_shape[1])
-    padding = (ori_shape[1] - target_shape[1] * ratio) / 2, (
-        ori_shape[0] - target_shape[0] * ratio
-    ) / 2
+    padding = (ori_shape[1] - target_shape[1] * ratio) / 2, (ori_shape[0] - target_shape[0] * ratio) / 2
 
     boxes[:, [0, 2]] -= padding[0]
     boxes[:, [1, 3]] -= padding[1]
@@ -118,12 +83,9 @@ def plot_box_and_label(
 ):
     # Add one xyxy box to image with label
     p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
-    cv2.rectangle(image, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
     if label:
         tf = max(lw - 1, 1)  # font thickness
-        w, h = cv2.getTextSize(label, 0, fontScale=lw / 3, thickness=tf)[
-            0
-        ]  # text width, height
+        w, h = cv2.getTextSize(label, 0, fontScale=lw / 3, thickness=tf)[0]  # text width, height
         outside = p1[1] - h - 3 >= 0  # label fits outside box
         p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
         cv2.rectangle(image, p1, p2, color, -1, cv2.LINE_AA)  # filled
@@ -137,6 +99,8 @@ def plot_box_and_label(
             thickness=tf,
             lineType=cv2.LINE_AA,
         )
+    else:
+        cv2.rectangle(image, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
 
 
 def generate_colors(i, bgr=False):
@@ -171,20 +135,26 @@ def generate_colors(i, bgr=False):
     return (color[2], color[1], color[0]) if bgr else color
 
 
-def make_csv(det):
-    csv = defaultdict(list)
-    for d in det:
-        x, y, x2, y2, c, _ = d
-        w, h = x2 - x, y2 - y
-        x, y = x + w / 2, y + h / 2
+def make_csv(dets):
+    result = []
+    if torch.is_tensor(dets) and len(dets.shape) == 2:
+        dets = dets[None]
 
-        csv["x_center"] += [int(x)]
-        csv["y_center"] += [int(y)]
-        csv["width"] += [int(w)]
-        csv["height"] += [int(h)]
-        csv["confidence"] += [float(c)]
-        csv["area"] += [int(w * h)]
-    return csv
+    for det in dets:
+        csv = defaultdict(list)
+        for d in det:
+            x, y, x2, y2, c, _ = d
+            w, h = x2 - x, y2 - y
+            x, y = x + w / 2, y + h / 2
+
+            csv["x_center"] += [int(x)]
+            csv["y_center"] += [int(y)]
+            csv["width"] += [int(w)]
+            csv["height"] += [int(h)]
+            csv["confidence"] += [float(c)]
+            csv["area"] += [int(w * h)]
+        result.append(csv)
+    return result
 
 
 def xywh2xyxy(x):
@@ -197,9 +167,7 @@ def xywh2xyxy(x):
     return y
 
 
-def letterbox(
-    im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleup=True, stride=32
-):
+def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleup=True, stride=32):
     """Resize and pad image while meeting stride-multiple constraints."""
     shape = im.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
@@ -226,9 +194,7 @@ def letterbox(
         im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-    im = cv2.copyMakeBorder(
-        im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color
-    )  # add border
+    im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
 
     return im, r, (left, top)
 
@@ -263,12 +229,8 @@ def non_max_suppression(
         torch.max(prediction[..., 5:], axis=-1)[0] > conf_thres,
     )  # candidates
     # Check the parameters.
-    assert (
-        0 <= conf_thres <= 1
-    ), f"conf_thresh must be in 0.0 to 1.0, however {conf_thres} is provided."
-    assert (
-        0 <= iou_thres <= 1
-    ), f"iou_thres must be in 0.0 to 1.0, however {iou_thres} is provided."
+    assert 0 <= conf_thres <= 1, f"conf_thresh must be in 0.0 to 1.0, however {conf_thres} is provided."
+    assert 0 <= iou_thres <= 1, f"iou_thres must be in 0.0 to 1.0, however {iou_thres} is provided."
 
     # Function settings.
     max_wh = 4096  # maximum box width and height
