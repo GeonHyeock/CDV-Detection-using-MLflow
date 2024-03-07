@@ -32,6 +32,7 @@ class Model(nn.Module):
             fuse_ab=fuse_ab,
             distill_ns=distill_ns,
         )
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         # Init Detect head
         self.stride = self.detect.stride
@@ -42,8 +43,8 @@ class Model(nn.Module):
 
     def forward(self, x):
         export_mode = torch.onnx.is_in_onnx_export() or self.export
+        x = x.type(torch.FloatTensor).to(self.device)
         if len(x) == 3:
-            x = x.type(torch.FloatTensor).to("cuda")
             x = torch.unsqueeze(x, 0)
         x = self.backbone(x)
         x = self.neck(x)
@@ -65,9 +66,7 @@ def make_divisible(x, divisor):
     return math.ceil(x / divisor) * divisor
 
 
-def build_network(
-    config, channels, num_classes, num_layers, fuse_ab=False, distill_ns=False
-):
+def build_network(config, channels, num_classes, num_layers, fuse_ab=False, distill_ns=False):
     depth_mul = config.model.depth_multiple
     width_mul = config.model.width_multiple
     num_repeat_backbone = config.model.backbone.num_repeats
@@ -78,14 +77,8 @@ def build_network(
     channels_list_neck = config.model.neck.out_channels
     use_dfl = config.model.head.use_dfl
     reg_max = config.model.head.reg_max
-    num_repeat = [
-        (max(round(i * depth_mul), 1) if i > 1 else i)
-        for i in (num_repeat_backbone + num_repeat_neck)
-    ]
-    channels_list = [
-        make_divisible(i * width_mul, 8)
-        for i in (channels_list_backbone + channels_list_neck)
-    ]
+    num_repeat = [(max(round(i * depth_mul), 1) if i > 1 else i) for i in (num_repeat_backbone + num_repeat_neck)]
+    channels_list = [make_divisible(i * width_mul, 8) for i in (channels_list_backbone + channels_list_neck)]
 
     block = get_block(config.training_mode)
     BACKBONE = eval(config.model.backbone.type)
@@ -136,18 +129,14 @@ def build_network(
         if num_layers != 3:
             LOGGER.error("ERROR in: Distill mode not fit on n/s models with P6 head.\n")
             exit()
-        head_layers = build_effidehead_layer(
-            channels_list, 1, num_classes, reg_max=reg_max
-        )
+        head_layers = build_effidehead_layer(channels_list, 1, num_classes, reg_max=reg_max)
         head = Detect(num_classes, num_layers, head_layers=head_layers, use_dfl=use_dfl)
 
     elif fuse_ab:
         from yolov6.models.heads.effidehead_fuseab import Detect, build_effidehead_layer
 
         anchors_init = config.model.head.anchors_init
-        head_layers = build_effidehead_layer(
-            channels_list, 3, num_classes, reg_max=reg_max, num_layers=num_layers
-        )
+        head_layers = build_effidehead_layer(channels_list, 3, num_classes, reg_max=reg_max, num_layers=num_layers)
         head = Detect(
             num_classes,
             anchors_init,
@@ -159,16 +148,12 @@ def build_network(
     else:
         from yolov6.models.effidehead import Detect, build_effidehead_layer
 
-        head_layers = build_effidehead_layer(
-            channels_list, 1, num_classes, reg_max=reg_max, num_layers=num_layers
-        )
+        head_layers = build_effidehead_layer(channels_list, 1, num_classes, reg_max=reg_max, num_layers=num_layers)
         head = Detect(num_classes, num_layers, head_layers=head_layers, use_dfl=use_dfl)
 
     return backbone, neck, head
 
 
 def build_model(cfg, num_classes, device, fuse_ab=False, distill_ns=False):
-    model = Model(
-        cfg, channels=3, num_classes=num_classes, fuse_ab=fuse_ab, distill_ns=distill_ns
-    ).to(device)
+    model = Model(cfg, channels=3, num_classes=num_classes, fuse_ab=fuse_ab, distill_ns=distill_ns).to(device)
     return model

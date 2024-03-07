@@ -2,7 +2,7 @@
 
 ## ⭐️ Project Introduce
 
-한양대학교 [STORM LAB](https://doorykimlab.wixsite.com/spectromicroscopylab)의 요청으로 제공된 데이터를 통하여 객체 검출 모델을 훈련하고 배포하였습니다.
+한양대학교 [STORM LAB](https://doorykimlab.wixsite.com/spectromicroscopylab)의 요청으로 제공된 데이터를 통하여 객체 검출 모델을 학습하고 배포하였습니다.
 
 <img width="100%" src="./images/CDV.png"/>
 
@@ -21,8 +21,8 @@ CDV라 예상되는 물질의 위치정보를 알면 후처리 기능을 이용�
 
 <img width="50%" src="./images/DBSCAN.png"/>
 
-DBSCAN을 활용하여 CDV라 예상되는 물질을 검출하려 하였으나 붉은 원 안의 물질은 서로 다른 물질이지만 하나의 물질로 인식하는 한계점이 있었다. \
-이러한 한계점을 극복하기 위하여 YOLO모델을 활용하기로 결정 하였다.
+DBSCAN을 활용하여 CDV라 예상되는 물질을 검출하려 하였으나 붉은 원 안의 물질은 서로 다른 물질이지만 하나의 물질로 인식하는 한계점이 있었습니다. \
+이러한 한계점을 극복하기 위하여 YOLO모델을 활용하기로 결정 하였습니다.
 
 ---
 
@@ -55,12 +55,18 @@ DBSCAN을 활용하여 CDV라 예상되는 물질을 검출하려 하였으나 �
 
 ## Demo Video
 
-<img width="100%" src="./images/demo.gif"/>
+<img width="100%" src="./images/online_demo.gif"/>
 
 - 사용자의 이미지를 입력 받으면 CDV라 예상되는 물질의 위치정보를 Box형태로 시각화
 - conf_thres, iou_thres의 값을 유동적으로 변경하여 시각적으로 CDV의 예상위치를 확인 가능 \
 이를 통하여 DBSCAN의 서로 다른 물질이지만 하나의 물질로 인식하는 문제를 해소 가능
 - download 버튼을 클릭하여 원하는 정보의 csv 파일을 저장 가능
+
+<img width="100%" src="./images/batch_demo.gif"/>
+
+- 여러장의 이미지를 zip파일로 묶어 여러장의 이미지를 한번에 분석
+- Ray를 이용한 병렬처리로 단일 이미지 분석 대비 약 2.25배 빠른 추론
+
 
 ## Command
 
@@ -93,9 +99,3 @@ sudo docker build -t frontend -f streamlit_frontend/Dokcerfile .
 2. 실행
 sh shell/frontend.sh
 ~~~
-
-## TODO
-프로젝트 개선을 위해 고려해볼 것!
-1. Kubernetes
-2. DataBase
-3. Airflow
