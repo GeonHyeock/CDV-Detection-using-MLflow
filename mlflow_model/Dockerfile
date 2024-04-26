@@ -57,7 +57,6 @@ RUN apt-get -y update && \
 
 # code & requirment
 COPY ./mlflow_model /home/user/project/mlflow_model
-COPY ./data/ /home/user/project/data/
 WORKDIR /home/user/project/mlflow_model
 RUN pip install --upgrade pip && \
  pip install -r requirment.txt

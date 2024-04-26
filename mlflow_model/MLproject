@@ -2,6 +2,7 @@ name: yolo
 
 docker_env:
    image: mlflow_train
+   volumes: ["/home/inhamath/Clustering/data:/home/user/project/data"]
 
 entry_points:
   main:
