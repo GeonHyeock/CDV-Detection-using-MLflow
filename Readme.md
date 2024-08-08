@@ -1,8 +1,13 @@
 # MLOps -  CDV Detection Model
 
+## 📄 Published
+
+Hyung-Jun Lim, Gye Wan Kim, **Geon Hyeock Heo**, Uidon Jeong, Min Jeong Kim, Dokyung Jeong, Yoonsuk Hyun, Doory Kim†, "Nanoscale single-vesicle analysis: High-throughput approaches through AI-enhanced super-resolution image analysis", Biosensors and Bioelectronics, 263, 116629, 2024 [Link](https://www.sciencedirect.com/science/article/abs/pii/S0956566324006353)
+
 ## ⭐️ Project Introduce
 
-한양대학교 [STORM LAB](https://doorykimlab.wixsite.com/spectromicroscopylab)의 요청으로 제공된 데이터를 통하여 객체 검출 모델을 학습하고 배포하였습니다.
+한양대학교 [STORM LAB](https://doorykimlab.wixsite.com/spectromicroscopylab)에서 제공된 데이터를 통하여 객체 검출 모델을 학습하고 배포하였습니다.
+
 
 <img width="100%" src="./images/CDV.png"/>
 
